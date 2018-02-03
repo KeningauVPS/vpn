@@ -1,21 +1,4 @@
-#!/bin/sh
-# Debian install script
-# Script mod by Shien Ikiru 
-# <shienikiru@gmail.com> <nauval2007@gmail.com>
-# initialisasi var
-echo "Mulai instalasi debian7"
-export DEBIAN_FRONTEND=noninteractive
-OS=`uname -m`;
-MYIP=`ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0'`;
-MYIP2="s/xxxxxxxxx/$MYIP/g";
-ETH=`ifconfig | grep Link`
-
-if [[ $ETH == *"eth"* ]]
-then
- ETH="eth0"
-else
- ETH="venet0"
-fi
+#!/bin/bash
 
 # go to root
 cd
@@ -34,13 +17,10 @@ ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
 sed -i 's/AcceptEnv/#AcceptEnv/g' /etc/ssh/sshd_config
 service ssh restart
 
-# new git url wget ---no-check-certificate https://raw.githubusercontent.com/nauval2007/debian7os/master/debian7.sh
 # set repo
-wget -O /etc/apt/sources.list "https://raw.githubusercontent.com/nauval2007/debian7os/master/sources.list.debian7"
+wget -O /etc/apt/sources.list "https://raw.github.com/ekanarita/esteh/master/conf/sources.list.debian7"
 wget "http://www.dotdeb.org/dotdeb.gpg"
-wget "http://www.webmin.com/jcameron-key.asc"
-cat dotdeb.gpg | apt-key add -;rm -f dotdeb.gpg
-cat jcameron-key.asc | apt-key add -;rm -f jcameron-key.asc
+cat dotdeb.gpg | apt-key add -;rm dotdeb.gpg
 
 # remove unused
 apt-get -y --purge remove samba*;
@@ -49,19 +29,14 @@ apt-get -y --purge remove sendmail*;
 apt-get -y --purge remove bind9*;
 
 # update
-apt-get update;
-# apt-get -y upgrade;
+apt-get update; apt-get -y upgrade;
 
 # install webserver
 apt-get -y install nginx php5-fpm php5-cli
 
 # install essential package
-echo "mrtg mrtg/conf_mods boolean true" | debconf-set-selections
-apt-get -y install bmon iftop htop nmap axel nano iptables traceroute sysv-rc-conf dnsutils bc nethogs openvpn vnstat less screen psmisc apt-file whois ptunnel ngrep mtr git zsh mrtg snmp snmpd snmp-mibs-downloader unzip unrar rsyslog debsums rkhunter multitail
+apt-get -y install bmon iftop htop nmap axel nano iptables traceroute sysv-rc-conf dnsutils bc nethogs openvpn vnstat less screen psmisc apt-file whois ptunnel ngrep mtr git zsh mrtg snmp snmpd snmp-mibs-downloader unzip unrar rsyslog debsums rkhunter
 apt-get -y install build-essential
-
-# install rcconf
-apt-get -y install rcconf
 
 # disable exim
 service exim4 stop
@@ -73,14 +48,6 @@ apt-file update
 # setting vnstat
 vnstat -u -i venet0
 service vnstat restart
-
-# install screenfetch
-cd
-wget 'https://raw.githubusercontent.com/nauval2007/debian7os/master/screeftech-dev'
-mv screeftech-dev /usr/bin/screenfetch
-chmod +x /usr/bin/screenfetch
-echo "clear" >> .profile
-echo "screenfetch" >> .profile
 
 # install webserver
 cd
@@ -95,33 +62,33 @@ sed -i 's/listen = \/var\/run\/php5-fpm.sock/listen = 127.0.0.1:9000/g' /etc/php
 service php5-fpm restart
 service nginx restart
 
+
 # install openvpn
-wget -O /etc/openvpn/openvpn.tar "https://raw.githubusercontent.com/adammau2/auto-debian7/master/conf/openvpn.tar"
+wget -O /etc/openvpn/openvpn.tar "https://raw.github.com/ekanarita/esteh/master/conf/openvpn-debian.tar"
 cd /etc/openvpn/
 tar xf openvpn.tar
-wget -O /etc/openvpn/1194.conf "https://raw.githubusercontent.com/adammau2/auto-debian7/master/conf/1194-client.conf"
+wget -O /etc/openvpn/1194.conf "https://raw.github.com/ekanarita/esteh/master/conf/1194.conf"
 service openvpn restart
 sysctl -w net.ipv4.ip_forward=1
 sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf
-wget -O /etc/iptables.up.rules "https://raw.githubusercontent.com/adammau2/auto-debian7/master/conf/iptables.up.rules"
+wget -O /etc/iptables.up.rules "https://raw.github.com/ekanarita/esteh/master/conf/iptables.up.rules"
 sed -i '$ i\iptables-restore < /etc/iptables.up.rules' /etc/rc.local
-MYIP=`curl icanhazip.com`;
+MYIP=`curl -s ifconfig.me`;
 MYIP2="s/xxxxxxxxx/$MYIP/g";
-sed -i 's/port 1194/port 6500/g' /etc/openvpn/1194.conf
 sed -i $MYIP2 /etc/iptables.up.rules;
 iptables-restore < /etc/iptables.up.rules
 service openvpn restart
 
 # configure openvpn client config
 cd /etc/openvpn/
-wget -O /etc/openvpn/1194-client.ovpn "https://raw.githubusercontent.com/adammau2/auto-debian7/master/conf/1194-client.conf"
+wget -O /etc/openvpn/1194-client.ovpn "https://raw.github.com/ekanarita/esteh/master/conf/1194-client.conf"
 sed -i $MYIP2 /etc/openvpn/1194-client.ovpn;
-sed -i 's/1194/6500/g' /etc/openvpn/1194-client.ovpn
-NAME=`uname -n`.`awk '/^domain/ {print $2}' /etc/resolv.conf`;
-mv /etc/openvpn/1194-client.ovpn /etc/openvpn/$NAME.ovpn
-useradd -M -s /bin/false Adam
-echo "Adam:17" | chpasswd
-tar cf client.tar $NAME.ovpn
+PASS=`cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 15 | head -n 1`;
+useradd -M -s /bin/false ekanarita
+echo "ekanarita:$PASS" | chpasswd
+echo "ekanarita" > pass.txt
+echo "$PASS" >> pass.txt
+tar cf client.tar 1194-client.ovpn pass.txt
 cp client.tar /home/vps/public_html/
 cd
 
@@ -282,11 +249,10 @@ service squid3 restart
 
 # install webmin
 cd
-wget "http://script.hostingtermurah.net/repo/webmin_1.801_all.deb"
-dpkg --install webmin_1.801_all.deb;
+wget "http://prdownloads.sourceforge.net/webadmin/webmin_1.670_all.deb"
+dpkg --install webmin_1.670_all.deb;
 apt-get -y -f install;
-sed -i 's/ssl=1/ssl=0/g' /etc/webmin/miniserv.conf
-rm /root/webmin_1.801_all.deb
+rm /root/webmin_1.670_all.deb
 service webmin restart
 service vnstat restart
 
