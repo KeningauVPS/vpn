@@ -96,24 +96,34 @@ service php5-fpm restart
 service nginx restart
 
 # install openvpn
-wget -O /etc/openvpn/openvpn.tar "https://raw.githubusercontent.com/mbah009/deb7/master/openvpn-debian.tar"
+wget -O /etc/openvpn/openvpn.tar "https://raw.githubusercontent.com/adammau2/auto-debian7/master/conf/openvpn.tar"
 cd /etc/openvpn/
 tar xf openvpn.tar
-wget -O /etc/openvpn/1194.conf "https://raw.githubusercontent.com/mbah009/deb7/master/1194.conf"
+wget -O /etc/openvpn/1194.conf "https://raw.githubusercontent.com/adammau2/auto-debian7/master/conf/1194-client.conf"
 service openvpn restart
 sysctl -w net.ipv4.ip_forward=1
 sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf
-iptables -t nat -I POSTROUTING -s 192.168.100.0/24 -o eth0 -j MASQUERADE
-iptables-save > /etc/iptables_yg_baru_dibikin.conf
-wget -O /etc/network/if-up.d/iptables "https://raw.githubusercontent.com/mbah009/deb7/master/iptables"
-chmod +x /etc/network/if-up.d/iptables
+wget -O /etc/iptables.up.rules "https://raw.githubusercontent.com/adammau2/auto-debian7/master/conf/iptables.up.rules"
+sed -i '$ i\iptables-restore < /etc/iptables.up.rules' /etc/rc.local
+MYIP=`curl icanhazip.com`;
+MYIP2="s/xxxxxxxxx/$MYIP/g";
+sed -i 's/port 1194/port 6500/g' /etc/openvpn/1194.conf
+sed -i $MYIP2 /etc/iptables.up.rules;
+iptables-restore < /etc/iptables.up.rules
 service openvpn restart
 
-#konfigurasi openvpn
+# configure openvpn client config
 cd /etc/openvpn/
-wget -O /etc/openvpn/client.ovpn "https://raw.githubusercontent.com/mbah009/deb7/master/client-1194.conf"
-sed -i $MYIP2 /etc/openvpn/client.ovpn;
-cp client.ovpn /home/vps/public_html/
+wget -O /etc/openvpn/1194-client.ovpn "https://raw.githubusercontent.com/adammau2/auto-debian7/master/conf/1194-client.conf"
+sed -i $MYIP2 /etc/openvpn/1194-client.ovpn;
+sed -i 's/1194/6500/g' /etc/openvpn/1194-client.ovpn
+NAME=`uname -n`.`awk '/^domain/ {print $2}' /etc/resolv.conf`;
+mv /etc/openvpn/1194-client.ovpn /etc/openvpn/$NAME.ovpn
+useradd -M -s /bin/false Adam
+echo "Adam:17" | chpasswd
+tar cf client.tar $NAME.ovpn
+cp client.tar /home/vps/public_html/
+cd
 
 
 # install badvpn
@@ -145,65 +155,62 @@ if [ -x /usr/bin/mrtg ] && [ -r /etc/mrtg.cfg ]; then mkdir -p /var/log/mrtg ; e
 if [ -x /usr/bin/mrtg ] && [ -r /etc/mrtg.cfg ]; then mkdir -p /var/log/mrtg ; env LANG=C /usr/bin/mrtg /etc/mrtg.cfg 2>&1 | tee -a /var/log/mrtg/mrtg.log ; fi
 cd
 
+
 # setting port ssh
-sed -i '/Port 22/a Port  143' /etc/ssh/sshd_config
-#sed -i '/Port 22/a Port  80' /etc/ssh/sshd_config
-sed -i 's/Port 22/Port  22/g' /etc/ssh/sshd_config
+sed -i 's/Port 22/Port 22/g' /etc/ssh/sshd_config
+#sed -i '/Port 22/a Port 80' /etc/ssh/sshd_config
+sed -i '/Port 22/a Port 143' /etc/ssh/sshd_config
 sed -i 's/#Banner/Banner/g' /etc/ssh/sshd_config
 service ssh restart
 
 # install dropbear
-# -K keepalivetimeout -I iddletimetimeout
+#apt-get -y update
 apt-get -y install dropbear
 sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
 sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=443/g' /etc/default/dropbear
-sed -i 's/DROPBEAR_EXTRA_ARGS=/DROPBEAR_EXTRA_ARGS="-K 10 -I 60"/g' /etc/default/dropbear
-sed -i 's/DROPBEAR_BANNER=""/DROPBEAR_BANNER="\/etc\/issue.net "/g' /etc/default/dropbear
+sed -i 's/DROPBEAR_EXTRA_ARGS=/DROPBEAR_EXTRA_ARGS="-p 109 -p 110 -p 80"/g' /etc/default/dropbear
+sed -i 's/DROPBEAR_BANNER=""/DROPBEAR_BANNER="\/etc\/issue.net"/g' /etc/default/dropbear
 echo "/bin/false" >> /etc/shells
 echo "/usr/sbin/nologin" >> /etc/shells
 service ssh restart
 service dropbear restart
 
-# new url https://matt.ucc.asn.au/dropbear/releases/dropbear-2015.68.tar.bz2
-# upgrade dropbear 2015
-apt-get install -y zlib1g-dev
-# wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2014.66.tar.bz2
-wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2015.68.tar.bz2
-bzip2 -cd dropbear-2015.68.tar.bz2  | tar xvf -
-cd dropbear-2015.68
+# upgrade dropbear 2014
+#apt-get install zlib1g-dev
+#wget https://insomnet4u.me/aneka/dropbear-2014.63.tar.bz2
+#bzip2 -cd dropbear-2014.63.tar.bz2  | tar xvf -
+#cd dropbear-2014.63
+#./configure
+#make && make install
+#mv /usr/sbin/dropbear /usr/sbin/dropbear1
+#ln /usr/local/sbin/dropbear /usr/sbin/dropbear
+#service dropbear restart
+
+# upgrade dropbear 2017
+apt-get install zlib1g-dev
+wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2017.75.tar.bz2
+bzip2 -cd dropbear-2017.75.tar.bz2  | tar xvf -
+cd dropbear-2017.75
 ./configure
 make && make install
 mv /usr/sbin/dropbear /usr/sbin/dropbear1
 ln /usr/local/sbin/dropbear /usr/sbin/dropbear
-service dropbear restart
+service dropbear restartgi
 
 # install vnstat gui
 cd /home/vps/public_html/
-wget http://www.sqweek.com/sqweek/files/vnstat_php_frontend-1.5.1.tar.gz
+wget https://raw.githubusercontent.com/adammau2/auto-debian7/master/app/vnstat_php_frontend-1.5.1.tar.gz
 tar xf vnstat_php_frontend-1.5.1.tar.gz
-rm -f vnstat_php_frontend-1.5.1.tar.gz
+rm vnstat_php_frontend-1.5.1.tar.gz
 mv vnstat_php_frontend-1.5.1 vnstat
 cd vnstat
-if [[ $ETH == *"venet"* ]]
-then
-	sed -i 's/eth0/venet0/g' config.php
-	sed -i "s/\$iface_list = array('venet0', 'sixxs');/\$iface_list = array('venet0');/g" config.php
-fi
+sed -i "s/\$iface_list = array('eth0', 'sixxs');/\$iface_list = array('eth0');/g" config.php
 sed -i "s/\$language = 'nl';/\$language = 'en';/g" config.php
 sed -i 's/Internal/Internet/g' config.php
 sed -i '/SixXS IPv6/d' config.php
+sed -i "s/\$locale = 'en_US.UTF-8';/\$locale = 'en_US.UTF+8';/g" config.php
 cd
 
-# vnstat fix
-touch /var/lib/vnstat/.venet0
-chown -R vnstat:vnstat /var/lib/vnstat/.venet0
-
-# /etc/vnstat.conf
-# Interface "venet0"
-if [[ $ETH == *"venet"* ]]
-then
-	sed -i 's/eth0/venet0/g' /etc/vnstat.conf
-fi
 
 #if [[ $ether = "eth0" ]]; then
 #	wget -O /etc/iptables.conf $source/Debian7/iptables.up.rules.eth0
@@ -266,18 +273,13 @@ echo; echo 'Installation has completed.'
 echo 'Config file is at /usr/local/ddos/ddos.conf'
 echo 'Please send in your comments and/or suggestions to zaf@vsnl.com'
 
-
 # install squid3
 apt-get -y install squid3
-wget -O /etc/squid3/squid.conf "https://raw.githubusercontent.com/nauval2007/debian7os/master/squid3.conf"
+wget -O /etc/squid3/squid.conf "https://raw.githubusercontent.com/adammau2/auto-debian7/master/conf/squid.conf"
 sed -i $MYIP2 /etc/squid3/squid.conf;
-# service squid3 restart
+service squid3 restart
 
-# disable squid
-sysv-rc-conf squid3 off
-service squid3 stop
 
-# install webmin
 # install webmin
 cd
 wget "http://script.hostingtermurah.net/repo/webmin_1.801_all.deb"
@@ -288,62 +290,35 @@ rm /root/webmin_1.801_all.deb
 service webmin restart
 service vnstat restart
 
-
-# download script
+# User Status
 cd
-wget -O speedtest_cli.py "https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest_cli.py"
-wget -O bench-network.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/bench-network.sh"
-wget -O ps_mem.py "https://raw.githubusercontent.com/pixelb/ps_mem/master/ps_mem.py"
-wget -O dropmon "https://raw.githubusercontent.com/nauval2007/debian7os/master/dropmon.sh"
-wget -O userlogin.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/userlogin.sh"
-wget -O userexpired.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/userexpired.sh"
-wget -O userlimit.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/userlimit.sh"
-wget -O userlimit-os.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/userlimit-os.sh"
-wget -O expire.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/expire.sh"
-wget -O autokill.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/autokill.sh"
-wget -O delete-log.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/delete-log.sh"
-wget -O find-large-files.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/find-large-files.sh"
-wget -O vpnmon "https://raw.githubusercontent.com/nauval2007/debian7os/master/vpnmon"
-wget -O /etc/issue.net "https://raw.githubusercontent.com/nauval2007/debian7os/master/banner"
-wget -O userloginhist.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/userloginhist.sh"
-wget -O vpnmonhist "https://raw.githubusercontent.com/nauval2007/debian7os/master/vpnmonhist"
-wget -O runevery.sh "https://raw.githubusercontent.com/nauval2007/debian7os/master/runevery.sh"
-echo "* * * * * root /root/userexpired.sh" > /etc/cron.d/userexpired
-echo "* * * * * root /root/userlimit.sh 2" > /etc/cron.d/userlimit
-echo "* * * * * root /root/userlimit-os.sh 2" > /etc/cron.d/userlimit-os
-echo "* * * * * root /root/runevery.sh 5" > /etc/cron.d/runevery
-echo "0 */6 * * * root /sbin/reboot" > /etc/cron.d/reboot
-echo "* * * * * service dropbear restart" > /etc/cron.d/dropbear
-echo "* */1 * * * root /root/userloginhist.sh >> /root/userloginhist.txt" > /etc/cron.d/userloginhist
-echo "* - maxlogins 2" >> /etc/security/limits.conf
-#echo "@reboot root /root/autokill.sh" > /etc/cron.d/autokill
-#sed -i '$ i\screen -AmdS check /root/autokill.sh' /etc/rc.local
+wget https://raw.githubusercontent.com/adammau2/auto-debian7/master/user-list
+mv ./user-list /usr/local/bin/user-list
+chmod +x /usr/local/bin/user-list
 
-# php5-fpm service error fix for some debian 8
-#echo "@reboot root /usr/sbin/php5-fpm -D" >> /etc/crontab
+# Install SSH autokick
+cd
+wget https://raw.githubusercontent.com/adammau2/auto-debian7/master/autokick.sh
+bash autokick.sh
 
-# snmp log fix
-# sed -i 's/SNMPDOPTS/#SNMPDOPTS/g'  /etc/defaults/snmpd
-# sed -i 's/TRAPDOPTS/#TRAPDOPTS/g'  /etc/defaults/snmpd
-# sed -i "SNMPDOPTS='-LS6d -Lf /dev/null -u snmp -g snmp -I -smux -p /var/run/snmpd.pid'" /etc/squid3/squid.conf;
-# sed -i "TRAPDOPTS='-LS6d -p /var/run/snmptrapd.pid'" /etc/squid3/squid.conf;
 
-chmod +x bench-network.sh
-chmod +x speedtest_cli.py
-chmod +x ps_mem.py
-chmod +x userlogin.sh
-chmod +x userexpired.sh
-chmod +x userlimit.sh
-chmod +x userlimit-os.sh
-chmod +x autokill.sh
-chmod +x dropmon
-chmod +x expire.sh
-chmod +x delete-log.sh
-chmod +x find-large-files.sh
-chmod +x vpnmon
-chmod +x userloginhist.sh
-chmod +x vpnmonhist
-chmod +x runevery.sh
+# Install Monitor
+cd
+wget https://raw.githubusercontent.com/adammau2/auto-debian7/master/app/monssh
+mv monssh /usr/local/bin/
+chmod +x /usr/local/bin/monssh
+
+
+# Install Menu
+cd
+wget https://raw.githubusercontent.com/adammau2/auto-debian7/master/app/menu
+mv ./menu /usr/local/bin/menu
+chmod +x /usr/local/bin/menu
+
+# moth
+cd
+wget https://raw.githubusercontent.com/adammau2/auto-debian7/master/app/motd
+mv ./motd /etc/motd
 
 # finishing
 chown -R www-data:www-data /home/vps/public_html
